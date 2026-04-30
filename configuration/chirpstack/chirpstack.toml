@@ -1,0 +1,72 @@
+[logging]
+  level="info"
+  json=false
+
+[postgresql]
+  dsn="postgresql://chirpstack:chirpstack@chirpstack-postgres/chirpstack?sslmode=disable"
+  max_open_connections=10
+
+[redis]
+  servers=[
+    "redis://chirpstack-redis/",
+  ]
+  cluster=false
+  key_prefix=""
+  max_open_connections=100
+
+[api]
+  bind="0.0.0.0:8080"
+  secret="GD-chirpstack-demo-secret-change-me"
+
+[gateway]
+  allow_unknown_gateways=false
+  rx_timestamp_max_drift="30s"
+
+[network]
+  net_id="000000"
+  enabled_regions=[
+    "eu868",
+  ]
+  deduplication_delay="200ms"
+  get_downlink_data_delay="100ms"
+  mac_commands_disabled=false
+
+  [network.scheduler]
+    interval="1s"
+    class_a_lock_duration="5s"
+    class_c_lock_duration="5s"
+    multicast_class_c_margin="5s"
+    multicast_class_b_margin="5s"
+
+[monitoring]
+  bind="0.0.0.0:8081"
+  backend_interfaces_log_max_history=20
+  meta_log_max_history=20
+  gateway_frame_log_max_history=20
+  device_frame_log_max_history=20
+  device_event_log_max_history=20
+  per_gateway_frame_log_max_history=20
+  per_gateway_frame_log_ttl="1month"
+  per_device_frame_log_max_history=20
+  per_device_frame_log_ttl="1month"
+  per_device_event_log_max_history=20
+  per_device_event_log_ttl="1month"
+
+[integration]
+  enabled=[
+    "mqtt",
+  ]
+
+  [integration.mqtt]
+    event_topic="application/{{application_id}}/device/{{dev_eui}}/event/{{event}}"
+    command_topic="application/{{application_id}}/device/{{dev_eui}}/command/{{command}}"
+    json=true
+    server="tcp://chirpstack-mosquitto:1883/"
+    username=""
+    password=""
+    qos=0
+    clean_session=true
+    client_id=""
+
+[user_authentication]
+  enabled="internal"

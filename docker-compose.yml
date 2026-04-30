@@ -1,0 +1,213 @@
+services:
+  vb-db:
+    image: mongo:7
+    pull_policy: always
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-root}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-root}
+      MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE:-GD}
+    ports:
+      - "27017:27017"
+    volumes:
+      - vb_mongo:/data/db
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mongosh --quiet \"mongodb://${MONGO_INITDB_ROOT_USERNAME:-root}:${MONGO_INITDB_ROOT_PASSWORD:-root}@localhost:27017/admin\" --eval \"db.adminCommand({ ping: 1 }).ok\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+
+  vb-mongo-express:
+    image: mongo-express:1.0.2
+    pull_policy: always
+    restart: unless-stopped
+    environment:
+      ME_CONFIG_MONGODB_URL: mongodb://${MONGO_INITDB_ROOT_USERNAME:-root}:${MONGO_INITDB_ROOT_PASSWORD:-root}@vb-db:27017/
+      ME_CONFIG_BASICAUTH_USERNAME: ${MONGO_EXPRESS_USERNAME:-admin}
+      ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO_EXPRESS_PASSWORD:-admin}
+    ports:
+      - "5050:8081"
+    depends_on:
+      vb-db:
+        condition: service_healthy
+
+  chirpstack-mosquitto:
+    image: eclipse-mosquitto:2
+    pull_policy: always
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./configuration/mosquitto/config:/mosquitto/config:ro
+
+  vb-api:
+    build:
+      context: ./api
+    restart: unless-stopped
+    environment:
+      MONGODB_URI: mongodb://${MONGO_INITDB_ROOT_USERNAME:-root}:${MONGO_INITDB_ROOT_PASSWORD:-root}@vb-db:27017/${MONGO_INITDB_DATABASE:-GD}?authSource=admin
+      MONGODB_DB: ${MONGO_INITDB_DATABASE:-GD}
+      CHIRPSTACK_MQTT_ENABLED: "true"
+      CHIRPSTACK_MQTT_HOST: chirpstack-mosquitto
+      CHIRPSTACK_MQTT_PORT: "1883"
+      CHIRPSTACK_MQTT_TOPIC: application/+/device/+/event/+
+      DEFAULT_SITE_NAME: ChirpStack Lab
+    ports:
+      - "8000:8000"
+    depends_on:
+      vb-db:
+        condition: service_healthy
+      chirpstack-mosquitto:
+        condition: service_started
+
+  demo-seeder:
+    build:
+      context: ./api
+    environment:
+      MONGODB_URI: mongodb://${MONGO_INITDB_ROOT_USERNAME:-root}:${MONGO_INITDB_ROOT_PASSWORD:-root}@vb-db:27017/${MONGO_INITDB_DATABASE:-GD}?authSource=admin
+      MONGODB_DB: ${MONGO_INITDB_DATABASE:-GD}
+      CHIRPSTACK_MQTT_ENABLED: "false"
+    command: ["python", "-m", "app.seed_demo"]
+    restart: "no"
+    depends_on:
+      vb-db:
+        condition: service_healthy
+
+  demo-publisher:
+    build:
+      context: ./demo-publisher
+    restart: unless-stopped
+    environment:
+      MQTT_HOST: chirpstack-mosquitto
+      MQTT_PORT: "1883"
+      API_BASE: http://vb-api:8000
+      DEMO_DEVICE_COUNT: "5"
+      DEMO_PUBLISH_INTERVAL: "30"
+      DEMO_SITE_NAME: Demo Site
+      DEMO_TENANT_NAME: Demo Tenant
+      DEMO_APPLICATION_NAME: Demo Application
+      DEMO_GATEWAY_ID: demo-gateway-0001
+      DEMO_ATTACKS_ENABLED: "true"
+      DEMO_ATTACK_EVERY_N_BATCHES: "4"
+      DEMO_STATUS_EVERY_N_BATCHES: "2"
+      DEMO_ACK_EVERY_N_BATCHES: "3"
+      DEMO_STARTUP_DELAY: "10"
+      DEMO_API_WAIT_TIMEOUT: "180"
+      DEMO_MQTT_WAIT_TIMEOUT: "180"
+    depends_on:
+      chirpstack-mosquitto:
+        condition: service_started
+      vb-api:
+        condition: service_started
+      demo-seeder:
+        condition: service_completed_successfully
+
+  vb-web:
+    build:
+      context: ./web
+    restart: unless-stopped
+    environment:
+      API_INTERNAL_URL: http://vb-api:8000
+      NEXT_PUBLIC_API_BASE: http://localhost:8000
+    ports:
+      - "127.0.0.1:8081:3000"
+    depends_on:
+      - vb-api
+
+  chirpstack-postgres:
+    image: postgres:14-alpine
+    pull_policy: always
+    restart: unless-stopped
+    profiles: ["full-lorawan"]
+    environment:
+      POSTGRES_USER: chirpstack
+      POSTGRES_PASSWORD: chirpstack
+      POSTGRES_DB: chirpstack
+    volumes:
+      - chirpstack_postgres:/var/lib/postgresql/data
+      - ./configuration/postgresql/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chirpstack -d chirpstack"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+
+  chirpstack-redis:
+    image: redis:7-alpine
+    pull_policy: always
+    restart: unless-stopped
+    profiles: ["full-lorawan"]
+    command: redis-server --save 300 1 --save 60 100 --appendonly no
+    volumes:
+      - chirpstack_redis:/data
+
+  chirpstack:
+    image: chirpstack/chirpstack:4
+    pull_policy: always
+    restart: unless-stopped
+    profiles: ["full-lorawan"]
+    command: --config /etc/chirpstack
+    environment:
+      MQTT_BROKER_HOST: chirpstack-mosquitto
+      REDIS_HOST: chirpstack-redis
+      POSTGRESQL_HOST: chirpstack-postgres
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./configuration/chirpstack:/etc/chirpstack:ro
+    depends_on:
+      chirpstack-postgres:
+        condition: service_healthy
+      chirpstack-redis:
+        condition: service_started
+      chirpstack-mosquitto:
+        condition: service_started
+
+  chirpstack-rest-api:
+    image: chirpstack/chirpstack-rest-api:4
+    pull_policy: always
+    restart: unless-stopped
+    profiles: ["full-lorawan"]
+    command: --server chirpstack:8080 --bind 0.0.0.0:8090 --insecure --cors "*"
+    ports:
+      - "8090:8090"
+    depends_on:
+      - chirpstack
+
+  chirpstack-gateway-bridge:
+    image: chirpstack/chirpstack-gateway-bridge:4
+    pull_policy: always
+    restart: unless-stopped
+    profiles: ["full-lorawan"]
+    ports:
+      - "1700:1700/udp"
+    volumes:
+      - ./configuration/chirpstack-gateway-bridge:/etc/chirpstack-gateway-bridge:ro
+    depends_on:
+      - chirpstack-mosquitto
+
+  chirpstack-simulator:
+    build:
+      context: ./simulator
+    restart: unless-stopped
+    profiles: ["full-lorawan"]
+    environment:
+      CHIRPSTACK_API_KEY: ${CHIRPSTACK_API_KEY:-}
+      CHIRPSTACK_TENANT_ID: ${CHIRPSTACK_TENANT_ID:-}
+      SIM_DEVICE_COUNT: ${SIM_DEVICE_COUNT:-5}
+      SIM_DURATION: ${SIM_DURATION:-0s}
+      SIM_UPLINK_INTERVAL: ${SIM_UPLINK_INTERVAL:-30s}
+      SIM_PAYLOAD_HEX: ${SIM_PAYLOAD_HEX:-03E807D2320CE4}
+    depends_on:
+      - chirpstack
+      - chirpstack-rest-api
+      - chirpstack-gateway-bridge
+
+volumes:
+  vb_mongo:
+  chirpstack_postgres:
+  chirpstack_redis:

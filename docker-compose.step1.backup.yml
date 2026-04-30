@@ -1,0 +1,29 @@
+﻿services:
+  db:
+    image: timescale/timescaledb:latest-pg15
+    container_name: vb-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-GD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - vb_db:/var/lib/postgresql/data
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: vb-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@demo.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-change-me-now}
+    ports:
+      - "5050:80"
+    volumes:
+      - vb_pgadmin:/var/lib/pgadmin
+    depends_on:
+      - db
+
+volumes:
+  vb_db:
+  vb_pgadmin:

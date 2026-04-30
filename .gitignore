@@ -1,0 +1,13 @@
+# Local environment and secrets
+.env
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Node / Next build output
+node_modules/
+.next/
+
+# Archives
+*.zip

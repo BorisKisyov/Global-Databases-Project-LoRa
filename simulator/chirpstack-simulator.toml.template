@@ -1,0 +1,41 @@
+[general]
+  log_level=4
+
+[chirpstack]
+  [chirpstack.api]
+    api_key="__API_KEY__"
+    server="chirpstack:8080"
+    insecure=true
+
+  [chirpstack.integration.mqtt]
+    server="tcp://chirpstack-mosquitto:1883"
+    username=""
+    password=""
+
+  [chirpstack.gateway.backend.mqtt]
+    server="tcp://chirpstack-mosquitto:1883"
+    username=""
+    password=""
+
+[[simulator]]
+  tenant_id="__TENANT_ID__"
+  duration="__DURATION__"
+  activation_time="15s"
+
+  [simulator.device]
+    count=__DEVICE_COUNT__
+    uplink_interval="__UPLINK_INTERVAL__"
+    f_port=10
+    payload="__PAYLOAD_HEX__"
+    frequency=868100000
+    bandwidth=125000
+    spreading_factor=7
+
+  [simulator.gateway]
+    min_count=1
+    max_count=1
+    event_topic_template="eu868/gateway/{{ .GatewayID }}/event/{{ .Event }}"
+    command_topic_template="eu868/gateway/{{ .GatewayID }}/command/{{ .Command }}"
+
+[prometheus]
+  bind="0.0.0.0:9000"

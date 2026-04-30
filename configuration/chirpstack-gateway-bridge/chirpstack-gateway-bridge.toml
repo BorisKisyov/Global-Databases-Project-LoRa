@@ -1,0 +1,33 @@
+[general]
+  log_level=4
+  log_to_syslog=false
+
+[backend]
+  type="semtech_udp"
+
+  [backend.semtech_udp]
+    udp_bind="0.0.0.0:1700"
+    fake_rx_time=false
+
+[integration]
+  marshaler="protobuf"
+
+  [integration.mqtt]
+    event_topic_template="eu868/gateway/{{ .GatewayID }}/event/{{ .EventType }}"
+    state_topic_template="eu868/gateway/{{ .GatewayID }}/state/{{ .StateType }}"
+    command_topic_template="eu868/gateway/{{ .GatewayID }}/command/#"
+    state_retained=true
+    keep_alive="30s"
+    max_reconnect_interval="1m0s"
+    terminate_on_connect_error=false
+
+    [integration.mqtt.auth]
+      type="generic"
+
+      [integration.mqtt.auth.generic]
+        servers=["tcp://chirpstack-mosquitto:1883"]
+        username=""
+        password=""
+        qos=0
+        clean_session=true
+        client_id=""
