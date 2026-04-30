@@ -224,7 +224,7 @@ def seed():
     print(f"Done. Inserted {inserted} measurements.")
     print(f"Devices: {len(DEVICES)}")
     print(f"Minutes per device: {MINUTES_TOTAL}")
-    print("Refresh http://localhost:8081")
+    print("Refresh http://localhost:38081")
 
 
 if __name__ == "__main__":

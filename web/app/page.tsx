@@ -46,6 +46,8 @@ async function getLatest(): Promise<LatestRow[]> {
   }
 }
 
+const docsBase = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:38000";
+
 function secondsSince(ts: string) {
   const now = Date.now();
   const then = new Date(ts).getTime();
@@ -395,7 +397,7 @@ export default async function Page() {
       <h1 style={{ marginBottom: 8 }}>Demo Dashboard (Local)</h1>
 
       <p style={{ fontSize: 12, color: "#555", marginTop: 0 }}>
-        API docs: <a href="http://localhost:8000/docs">http://localhost:8000/docs</a>
+        API docs: <a href={`${docsBase}/docs`}>{docsBase}/docs</a>
       </p>
 
       <AutoRefresh intervalMs={10000} />

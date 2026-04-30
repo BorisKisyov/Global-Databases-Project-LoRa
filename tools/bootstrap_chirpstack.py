@@ -44,7 +44,7 @@ def main() -> None:
 
     print("Querying ChirpStack tenants...")
     req = Request(
-        "http://localhost:8090/api/tenants?limit=100&offset=0",
+        "http://localhost:38090/api/tenants?limit=100&offset=0",
         headers={
             "accept": "application/json",
             "Grpc-Metadata-Authorization": f"Bearer {token}",
